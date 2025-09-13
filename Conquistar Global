@@ -1,0 +1,394 @@
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+app.use(express.static("public"));
+
+let players = {};
+
+io.on("connection", (socket) => {
+  console.log("Jugador conectado:", socket.id);
+
+  socket.on("newPlayer", (data) => {
+    players[socket.id] = {
+      id: socket.id,
+      name: data.name,
+      crowns: 0,
+      troops: 10,
+      color: data.color,
+      country: data.country,
+      x: Math.random() * 800,
+      y: Math.random() * 600,
+    };
+    io.emit("updatePlayers", players);
+  });
+
+  socket.on("move", (data) => {
+    if (players[socket.id]) {
+      players[socket.id].x = data.x;
+      players[socket.id].y = data.y;
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("attack", (targetId) => {
+    if (players[targetId]) {
+      players[targetId].troops -= 2;
+      if (players[targetId].troops <= 0) {
+        players[socket.id].crowns++;
+        players[targetId].troops = 5;
+      }
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("bomb", (targetId) => {
+    if (players[targetId]) {
+      players[targetId].troops = Math.max(0, players[targetId].troops - 5);
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    delete players[socket.id];
+    io.emit("updatePlayers", players);
+  });
+});
+
+server.listen(3000, () => {
+  console.log("Servidor corriendo en http://localhost:3000");
+});
+{{
+  "name": "conquista-global",
+  "version": "1.0.0",
+  "description": "Juego multijugador en tiempo real",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+app.use(express.static("public"));
+
+let players = {};
+
+io.on("connection", (socket) => {
+  console.log("Jugador conectado:", socket.id);
+
+  socket.on("newPlayer", (data) => {
+    players[socket.id] = {
+      id: socket.id,
+      name: data.name,
+      crowns: 0,
+      troops: 10,
+      color: data.color,
+      country: data.country,
+      x: Math.random() * 800,
+      y: Math.random() * 600,
+    };
+    io.emit("updatePlayers", players);
+  });
+
+  socket.on("move", (data) => {
+    if (players[socket.id]) {
+      players[socket.id].x = data.x;
+      players[socket.id].y = data.y;
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("attack", (targetId) => {
+    if (players[targetId]) {
+      players[targetId].troops -= 2;
+      if (players[targetId].troops <= 0) {
+        players[socket.id].crowns++;
+        players[targetId].troops = 5;
+      }
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("bomb", (targetId) => {
+    if (players[targetId]) {
+      players[targetId].troops = Math.max(0, players[targetId].troops - 5);
+      io.emit("updatePlayers", players);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    delete players[socket.id];
+    io.emit("updatePlayers", players);
+  });
+});
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Conquista Global</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>🌍 Conquista Global</h1>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="controls">
+    <button onclick="sendAttack()">⚔ Ataque</button>
+    <button onclick="sendBomb()">💣 Bomba</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
+const socket = io();
+
+let players = {};
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let name = prompt("Escribe tu nombre:");
+let country = prompt("Nombre de tu país:");
+let color = "#" + Math.floor(Math.random() * 16777215).toString(16);
+
+socket.emit("newPlayer", { name, country, color });
+
+socket.on("updatePlayers", (data) => {
+  players = data;
+  draw();
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  socket.emit("move", { x: e.offsetX, y: e.offsetY });
+});
+
+function sendAttack() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("attack", targetId);
+}
+
+function sendBomb() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("bomb", targetId);
+}
+
+function getRandomTarget() {
+  let keys = Object.keys(players).filter(id => id !== socket.id);
+  if (keys.length === 0) return null;
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let id in players) {
+    let p = players[id];
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.fillText(`${p.name} (${p.country}) 👑${p.crowns}`, p.x - 30, p.y - 30);
+  }
+}
+body {
+  background: #111;
+  color: white;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+canvas {
+  background: #333;
+  margin-top: 20px;
+  border: 3px solid white;
+}
+server.listen(3000, () => {
+  console.log("Servidor corriendo en http://localhost:3000");
+});
+  "const socket = io();
+
+let players = {};
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let name = prompt("Escribe tu nombre:");
+let country = prompt("Nombre de tu país:");
+let color = "#" + Math.floor(Math.random() * 16777215).toString(16);
+
+socket.emit("newPlayer", { name, country, color });
+
+socket.on("updatePlayers", (data) => {
+  players = data;
+  draw();
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  socket.emit("move", { x: e.offsetX, y: e.offsetY });
+});
+
+function sendAttack() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("attack", targetId);
+}
+
+function sendBomb() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("bomb", targetId);
+}
+
+function getRandomTarget() {
+  let keys = Object.keys(players).filter(id => id !== socket.id);
+  if (keys.length === 0) return null;
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let id in players) {
+    let p = players[id];
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.fillText(`${p.name} (${p.country}) 👑${p.crowns}`, p.x - 30, p.y - 30);
+  }
+}
+body {
+  background: #111;
+  color: white;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+canvas {
+  background: #333;
+  margin-top: 20px;
+  border: 3px solid white;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Conquista Global</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>🌍 Conquista Global</h1>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="controls">
+    <button onclick="sendAttack()">⚔ Ataque</button>
+    <button onclick="sendBomb()">💣 Bomba</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</bobody {
+  background: #111;
+  color: white;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+canvas {
+  background: #333;
+  margin-top: 20px;
+  border: 3px solid white;
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Conquista Global</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>🌍 Conquista Global</h1>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="controls">
+    <button onclick="sendAttack()">⚔ Ataque</button>
+    <button onclick="sendBomb()">💣 Bomba</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
+const socket = io();
+
+let players = {};
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let name = prompt("Escribe tu nombre:");
+let country = prompt("Nombre de tu país:");
+let color = "#" + Math.floor(Math.random() * 16777215).toString(16);
+
+socket.emit("newPlayer", { name, country, color });
+
+socket.on("updatePlayers", (data) => {
+  players = data;
+  draw();
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  socket.emit("move", { x: e.offsetX, y: e.offsetY });
+});
+
+function sendAttack() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("attack", targetId);
+}
+
+function sendBomb() {
+  let targetId = getRandomTarget();
+  if (targetId) socket.emit("bomb", targetId);
+}
+
+function getRandomTarget() {
+  let keys = Object.keys(players).filter(id => id !== socket.id);
+  if (keys.length === 0) return null;
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let id in players) {
+    let p = players[id];
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    cSonido divertido de pelea videojuego (placeholder)
+Efecto click arcade (placeholder)tx.fillStyle = "white";
+    ctx.fillText(`${p.name} (${p.country}) 👑${p.crowns}`, p.x - 30, p.y - 30);
+ Efecto click arcade (placeholder)
+SExplosión realista (placeholder)
+Música divertida estilo videojuego (placeholder)onido divertido de pelea videojuego (placeholder) }
+
+}dy>
+</html>name": "conquista-global",
+  "version": "1.0.0",
+  "description": "Juego multijugador en tiempo real",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
